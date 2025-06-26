@@ -13,4 +13,5 @@ rlp = "0.5.2"
 anyhow = "1.0.79"
 serde = { version = "1.0.196", features = ["derive"] }
 dotenv = "0.15"
+jubjub = "0.10"
 

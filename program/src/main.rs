@@ -4,6 +4,9 @@
 
 use alloy_primitives::{hex, Keccak256};
 use rlp::Rlp;
+use jubjub::{Fr, SubgroupPoint};
+use jubjub::group::{Group, GroupEncoding};
+use jubjub::ff::Field;
 sp1_zkvm::entrypoint!(main);
 
 use serde::{Deserialize, Serialize};
@@ -26,6 +29,8 @@ pub fn main() {
 
     // Verify storage proof
     let storage_root = sp1_zkvm::io::read::<String>();
+    let commitment_hex = sp1_zkvm::io::read::<String>();
+    let blinding_hex = sp1_zkvm::io::read::<String>();
     let mut current_hash = storage_root.clone();
 
     let key_ptrs = sp.key_ptrs;
@@ -71,8 +76,15 @@ pub fn main() {
             let value_decoded = Rlp::new(leaf_node[1].data().unwrap());
             assert!(value_decoded.is_data());
             let value = hex::encode(value_decoded.data().unwrap());
-
-            sp1_zkvm::io::write(&value);
+            let amount = u64::from_str_radix(&value, 16).unwrap();
+            let mut blinding_bytes = [0u8; 32];
+            blinding_bytes.copy_from_slice(&hex::decode(blinding_hex.clone()).unwrap());
+            let blinding = Fr::from_bytes(&blinding_bytes).unwrap();
+            let g = SubgroupPoint::generator();
+            let h = g.double();
+            let commit = g * Fr::from(amount) + h * blinding;
+            let commit_bytes = commit.to_bytes();
+            assert_eq!(hex::encode(commit_bytes), commitment_hex);
         }
     }
 
