@@ -3,6 +3,8 @@ mod proof;
 mod utils;
 use crate::{proof::get_storage_proof, utils::Block};
 use sp1_core::{SP1Prover, SP1Stdin, SP1Verifier};
+use jubjub::{Fr, SubgroupPoint};
+use jubjub::group::{Group, GroupEncoding};
 
 const ELF: &[u8] = include_bytes!("../../program/elf/riscv32im-succinct-zkvm-elf");
 
@@ -16,18 +18,25 @@ fn main() {
         Err(e) => panic!("Error getting storage proof: {}", e),
     };
 
+    let amount: u64 = 10;
+    let blinding = Fr::from(3u64);
+    let g = SubgroupPoint::generator();
+    let h = g.double();
+    let commit = g * Fr::from(amount) + h * blinding;
+    let commit_hex = hex::encode(commit.to_bytes());
+    let blinding_hex = hex::encode(blinding.to_bytes());
+
     let mut stdin = SP1Stdin::new();
     let start = std::time::Instant::now();
     stdin.write(&trie_proof.0);
     stdin.write(&trie_proof.1);
+    stdin.write(&commit_hex);
+    stdin.write(&blinding_hex);
 
     let mut proof = SP1Prover::prove(ELF, stdin).expect("proving failed");
     let end = std::time::Instant::now();
 
     println!("Proof generation time: {:?}", end.duration_since(start));
-
-    let value = proof.stdout.read::<String>();
-    println!("storage slot value: {}", value);
 
     let state_root = proof.stdout.read::<String>();
     println!("state root: {}", state_root);
